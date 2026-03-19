@@ -224,7 +224,7 @@ async function startTelegramBot() {
   clientInstance = client;
 
   client.addEventHandler(onNewMessage, new NewMessage({ incoming: true }));
-  console.log(`[TELEGRAM] Conectado como: ${me.username || me.firstName || 'sin_username'} id: ${currentUserId}`);
+  console.log(`[TELEGRAM] Conectado como: ${me.username || 'sin_username'} id: ${currentUserId}`);
 
   return clientInstance;
 }
