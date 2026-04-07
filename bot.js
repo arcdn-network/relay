@@ -42,7 +42,12 @@ function normalizeText(text) {
 }
 
 function getCommandKey(text) {
-  return normalizeText(text).split(' ')[0];
+  const normalized = normalizeText(text);
+  const parts = normalized.split(/\s+/);
+
+  if (parts.length > 1) return null;
+
+  return parts[0];
 }
 
 function shouldBlockDuplicate(senderId, text) {
