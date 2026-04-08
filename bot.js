@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { SERVICES, SERVICES_MESSAGE } = require('./utils/constants.js');
+const { banUser, unbanUser, isBanned } = require('./services/banned');
 
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
@@ -175,6 +176,7 @@ async function sendNormalizedResponse(client, inputChat, response) {
     }
   }
 }
+
 function cleanupDuplicateMessages() {
   const now = Date.now();
 
@@ -185,21 +187,50 @@ function cleanupDuplicateMessages() {
   }
 }
 
+async function onOutgoingMessage(event) {
+  try {
+    if (!clientInstance || !event?.message) return;
+    if (!event.isPrivate) return;
+
+    const message = event.message;
+    if (!message.message) return;
+
+    const chatId = message?.peerId?.userId ? Number(message.peerId.userId) : null;
+    if (!chatId) return;
+
+    const normalizedText = normalizeText(message.message);
+
+    if (normalizedText === '/off') {
+      banUser(chatId);
+      return;
+    }
+
+    if (normalizedText === '/on') {
+      unbanUser(chatId);
+      return;
+    }
+  } catch (error) {
+    console.error('[TELEGRAM] Error en handler saliente:', error);
+  }
+}
+
 async function onNewMessage(event) {
   try {
     if (!clientInstance || !event?.message) return;
     if (!event.isPrivate) return;
 
     const message = event.message;
-    if (message.out) return;
     if (!message.message) return;
 
     const senderId = message?.fromId?.userId ? Number(message.fromId.userId) : null;
+    if (!senderId) return;
     if (currentUserId && senderId === currentUserId) return;
 
-    if (shouldBlockDuplicate(senderId, message.message)) {
-      return;
-    }
+    // ── Bloquear baneados ──
+    if (isBanned(senderId)) return;
+
+    // ── Flujo normal ──
+    if (shouldBlockDuplicate(senderId, message.message)) return;
 
     const response = getResponseConfig(message.message);
     if (!response) return;
@@ -229,6 +260,8 @@ async function startTelegramBot() {
   clientInstance = client;
 
   client.addEventHandler(onNewMessage, new NewMessage({ incoming: true }));
+  client.addEventHandler(onOutgoingMessage, new NewMessage({ outgoing: true }));
+
   console.log(`[TELEGRAM] Conectado como: ${me.username || 'sin_username'} id: ${currentUserId}`);
 
   return clientInstance;
